@@ -1,0 +1,119 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Safety Net catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Hardened Global Helper Primitives ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isAdmin() {
+      return isVerifiedUser() && (
+        request.auth.token.email == 'ballalanagasravan@gmail.com' ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
+      );
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // --- Entity Specific Validation Helpers ---
+    function isValidUser(u) {
+      return u.keys().hasAll(['uid', 'email', 'displayName', 'role'])
+          && u.uid is string && u.uid.size() <= 128
+          && u.email is string && u.email.size() <= 128
+          && u.displayName is string && u.displayName.size() <= 128
+          && u.role is string && (u.role == 'user' || u.role == 'admin');
+    }
+
+    function isValidReminder(r) {
+      return r.keys().hasAll(['id', 'userId', 'title', 'dueDate', 'status'])
+          && r.id is string && r.id.size() <= 128
+          && r.userId is string && r.userId.size() <= 128
+          && r.title is string && r.title.size() <= 256
+          && r.dueDate is string && r.dueDate.size() <= 128
+          && r.status is string && (r.status == 'pending' || r.status == 'completed')
+          && (!r.keys().contains('aiSummary') || (r.aiSummary is string && r.aiSummary.size() <= 2048));
+    }
+
+    function isValidPlan(p) {
+      return p.keys().hasAll(['id', 'userId', 'topic', 'targetGoal', 'steps'])
+          && p.id is string && p.id.size() <= 128
+          && p.userId is string && p.userId.size() <= 128
+          && p.topic is string && p.topic.size() <= 256
+          && p.targetGoal is string && p.targetGoal.size() <= 512
+          && p.steps is list && p.steps.size() <= 50;
+    }
+
+    function isValidSystemConfig(c) {
+      return c.keys().hasAll(['id', 'maintenanceMode', 'systemPrompt'])
+          && c.id is string && c.id.size() <= 128
+          && c.maintenanceMode is bool
+          && c.systemPrompt is string && c.systemPrompt.size() <= 4096
+          && (!c.keys().contains('allowedTools') || (c.allowedTools is list && c.allowedTools.size() <= 50))
+          && (!c.keys().contains('updatedBy') || (c.updatedBy is string && c.updatedBy.size() <= 128));
+    }
+
+    // --- Collections Matching & Access Control ---
+
+    // Users Collection
+    match /users/{userId} {
+      allow get: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow list: if isSignedIn() && isAdmin();
+      allow create: if isVerifiedUser() && request.auth.uid == userId && isValidUser(incoming());
+      allow update: if isVerifiedUser() && (
+        (request.auth.uid == userId && isValidUser(incoming()) && (incoming().role == existing().role || isAdmin())) ||
+        isAdmin()
+      );
+      allow delete: if isSignedIn() && isAdmin();
+    }
+
+    // Reminders Collection
+    match /reminders/{reminderId} {
+      allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isVerifiedUser() && incoming().userId == request.auth.uid && isValidReminder(incoming());
+      allow update: if isVerifiedUser() && (
+        (existing().userId == request.auth.uid && incoming().userId == request.auth.uid && isValidReminder(incoming())) ||
+        isAdmin()
+      );
+      allow delete: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+    }
+
+    // Plans Collection
+    match /plans/{planId} {
+      allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isVerifiedUser() && incoming().userId == request.auth.uid && isValidPlan(incoming());
+      allow update: if isVerifiedUser() && (
+        (existing().userId == request.auth.uid && incoming().userId == request.auth.uid && isValidPlan(incoming())) ||
+        isAdmin()
+      );
+      allow delete: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+    }
+
+    // Configs Collection
+    match /configs/{configId} {
+      allow read: if isSignedIn();
+      allow write: if isVerifiedUser() && isAdmin() && isValidSystemConfig(incoming());
+    }
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "name": "Paradox AI",
+  "description": "An exceptionally intelligent, human-like full-stack AI workspace with Google Auth, Admin panels, copywriting suites, Maps, and weather grounding systems.",
+  "requestFramePermissions": ["geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

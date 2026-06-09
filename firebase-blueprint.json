@@ -1,0 +1,80 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Represents a user profile in Paradox AI",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "role": { "type": "string", "enum": ["user", "admin"] },
+        "createdAt": { "type": "string" },
+        "lastLogin": { "type": "string" }
+      },
+      "required": ["uid", "email", "displayName", "role"]
+    },
+    "Reminder": {
+      "title": "Reminder",
+      "description": "An AI-powered reminder set by a user",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "dueDate": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "completed"] },
+        "aiSummary": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "userId", "title", "dueDate", "status"]
+    },
+    "Plan": {
+      "title": "Plan",
+      "description": "An AI-generated topic plan for a user",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "topic": { "type": "string" },
+        "targetGoal": { "type": "string" },
+        "steps": { "type": "array" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "userId", "topic", "targetGoal"]
+    },
+    "SystemConfig": {
+      "title": "SystemConfig",
+      "description": "System-wide settings managed by administrators",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "maintenanceMode": { "type": "boolean" },
+        "systemPrompt": { "type": "string" },
+        "allowedTools": { "type": "array" },
+        "updatedBy": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "maintenanceMode", "systemPrompt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profile collection, keyed by Firestore UID"
+    },
+    "/reminders/{reminderId}": {
+      "schema": "Reminder",
+      "description": "User reminders, accessible by the reminder owner"
+    },
+    "/plans/{planId}": {
+      "schema": "Plan",
+      "description": "AI topic plans, accessible by the plan owner"
+    },
+    "/configs/{configId}": {
+      "schema": "SystemConfig",
+      "description": "System configuration document, writable only by admins"
+    }
+  }
+}
